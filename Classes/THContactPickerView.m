@@ -46,7 +46,7 @@
 {
     self = [super initWithFrame:frame];
     if (self) {
-        // Initialization code        
+        // Initialization code
         [self setup];
     }
     return self;
@@ -100,10 +100,17 @@
 
 #pragma mark - Public functions
 
+- (void)setFontToPromptLabel:(UIFont *)font withAlpha:(float)alpha {
+    self.promptLabel.font = font;
+    self.promptLabel.alpha = alpha;
+    [self updateLabelFrames];
+}
+
 - (void)setFont:(UIFont *)font {
     _font = font;
     // Create a contact bubble to determine the height of a line
     THContactBubble *contactBubble = [[THContactBubble alloc] initWithName:@"Sample"];
+    contactBubble.textView.autocorrectionType = UITextAutocorrectionTypeNo;
     [contactBubble setFont:font];
     self.lineHeight = contactBubble.frame.size.height + 2 * kVerticalPadding;
     
@@ -122,12 +129,26 @@
     [self layoutView];
 }
 
+- (void)setPlaceholderLabelTextColor:(UIColor *)color{
+    self.placeholderLabel.textColor = color;
+}
+
+- (void)setPromptLabelTextColor:(UIColor *)color{
+    self.promptLabel.textColor = color;
+}
+
+- (void)setBackgroundColor:(UIColor *)backgroundColor{
+    self.scrollView.backgroundColor = backgroundColor;
+    [super setBackgroundColor:backgroundColor];
+}
+
 - (void)addContact:(id)contact withName:(NSString *)name {
     id contactKey = [NSValue valueWithNonretainedObject:contact];
     if ([self.contactKeys containsObject:contactKey]){
         NSLog(@"Cannot add the same object twice to ContactPickerView");
         return;
     }
+    
     if (self.contactKeys.count == 1 && self.limitToOne){
         THContactBubble *contactBubble = [self.contacts objectForKey:[self.contactKeys firstObject]];
         [self removeContactBubble:contactBubble];
@@ -136,6 +157,9 @@
     self.textView.text = @"";
     
     THContactBubble *contactBubble = [[THContactBubble alloc] initWithName:name style:self.bubbleStyle selectedStyle:self.bubbleSelectedStyle showComma:!self.limitToOne];
+    contactBubble.textView.autocorrectionType = UITextAutocorrectionTypeNo;
+    contactBubble.maxWidth = self.frame.size.width - self.promptLabel.frame.origin.x - 2 * kHorizontalPadding - 2 * kHorizontalSidePadding;
+    contactBubble.minWidth = kTextViewMinWidth + 2 * kHorizontalPadding;
     contactBubble.keyboardAppearance = self.keyboardAppearance;
     if (self.font != nil){
         [contactBubble setFont:self.font];
@@ -165,15 +189,15 @@
 
 - (void)removeAllContacts {
     for (id contact in [self.contacts allKeys]){
-      THContactBubble *contactBubble = [self.contacts objectForKey:contact];
-      [contactBubble removeFromSuperview];
+        THContactBubble *contactBubble = [self.contacts objectForKey:contact];
+        [contactBubble removeFromSuperview];
     }
     [self.contacts removeAllObjects];
     [self.contactKeys removeAllObjects];
-  
+    
     // update layout
     [self layoutView];
-  
+    
     self.textView.hidden = NO;
     self.textView.text = @"";
 }
@@ -191,7 +215,7 @@
     
     // update layout
     [self layoutView];
-
+    
     [self selectTextView];
     self.textView.text = @"";
     
@@ -200,17 +224,18 @@
 
 - (void)setPlaceholderLabelText:(NSString *)text {
     self.placeholderLabel.text = text;
-
+    
     [self layoutView];
 }
 
 - (void)resignFirstResponder {
     [self.textView resignFirstResponder];
+    [self.selectedContactBubble.textView resignFirstResponder];
 }
 
 - (void)setVerticalPadding:(CGFloat)viewPadding {
     _verticalPadding = viewPadding;
-
+    
     [self layoutView];
 }
 
@@ -218,13 +243,13 @@
     self.bubbleStyle = style;
     self.textView.textColor = style.textColor;
     self.bubbleSelectedStyle = selectedStyle;
-
+    
     for (id contactKey in self.contactKeys){
         THContactBubble *contactBubble = (THContactBubble *)[self.contacts objectForKey:contactKey];
-
+        
         contactBubble.style = style;
         contactBubble.selectedStyle = selectedStyle;
-
+        
         // this stuff reloads bubble
         if (contactBubble.isSelected){
             [contactBubble select];
@@ -272,17 +297,17 @@
     // Remove contactBubble from view
     THContactBubble *contactBubble = [self.contacts objectForKey:contactKey];
     [contactBubble removeFromSuperview];
-  
+    
     // Remove contact from memory
     [self.contacts removeObjectForKey:contactKey];
     [self.contactKeys removeObject:contactKey];
-  
+    
     // update layout
     [self layoutView];
-  
+    
     [self selectTextView];
     self.textView.text = @"";
-  
+    
     [self scrollToBottomWithAnimation:NO];
 }
 
@@ -327,7 +352,7 @@
             // Check if contact bubble will fit on the current line
             CGFloat width = bubbleFrame.size.width + 2 * kHorizontalPadding;
             if (self.frame.size.width - kHorizontalSidePadding - frameOfLastBubble.origin.x - frameOfLastBubble.size.width - width >= 0){ // add to the same line
-                                                                                                                 // Place contact bubble just after last bubble on the same line
+                // Place contact bubble just after last bubble on the same line
                 bubbleFrame.origin.x = frameOfLastBubble.origin.x + frameOfLastBubble.size.width + kHorizontalPadding * 2;
                 bubbleFrame.origin.y = frameOfLastBubble.origin.y;
             } else { // No space on line, jump to next line
@@ -349,7 +374,7 @@
     CGFloat minWidth = kTextViewMinWidth + 2 * kHorizontalPadding;
     CGFloat textViewHeight = self.lineHeight - 2 * kVerticalPadding;
     CGRect textViewFrame = CGRectMake(0, 0, self.textView.frame.size.width, textViewHeight);
-
+    
     // Check if we can add the text field on the same line as the last contact bubble
     if (self.frame.size.width - kHorizontalSidePadding - frameOfLastBubble.origin.x - frameOfLastBubble.size.width - minWidth >= 0){ // add to the same line
         textViewFrame.origin.x = frameOfLastBubble.origin.x + frameOfLastBubble.size.width + kHorizontalPadding;
@@ -363,15 +388,16 @@
         if (self.contacts.count == 0){
             lineCount = 0;
             textViewFrame.origin.x = [self firstLineXOffset];
+            textViewFrame.size.width = self.bounds.size.width - textViewFrame.origin.x;
         }
     }
     
     textViewFrame.origin.y = lineCount * self.lineHeight + kVerticalPadding + self.verticalPadding;
     self.textView.frame = textViewFrame;
-
+    
     // Add text view if it hasn't been added
     self.textView.center = CGPointMake(self.textView.center.x, lineCount * self.lineHeight + textViewHeight / 2 + kVerticalPadding + self.verticalPadding);
-
+    
     if (self.textView.superview == nil){
         [self.scrollView addSubview:self.textView];
     }
